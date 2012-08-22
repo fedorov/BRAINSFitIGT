@@ -1187,6 +1187,8 @@ BRAINSFitHelperTemplate<FixedImageType, MovingImageType>::StartRegistration(void
           test_MMICostMetric->SetUseExplicitPDFDerivatives(UseExplicitPDFDerivatives);
           }
         }
+      std::cout << "Saving the bspline initial transform" << std::endl;
+      itk::WriteTransformToDisk(initialBSplineTransform, "bspline_initial.tfm");
       outputBSplineTransform =
         DoBSpline< RegisterImageType, SpatialObjectType,
                    BSplineTransformType >(
@@ -1262,33 +1264,59 @@ BRAINSFitHelperTemplate<FixedImageType, MovingImageType>::StartRegistration(void
           dynamic_cast< ImageMaskSpatialObjectType * >( m_FixedBinaryVolume.GetPointer() ) );
         ImageMaskSpatialObjectType::Pointer movingImageMask(
           dynamic_cast< ImageMaskSpatialObjectType * >( m_MovingBinaryVolume.GetPointer() ) );
-
-        typedef ImageMaskSpatialObjectType::ImageType                            MaskImageType;
-        typedef itk::ResampleImageFilter< MaskImageType, MaskImageType, double > ResampleFilterType;
-        ResampleFilterType::Pointer resampler = ResampleFilterType::New();
-        resampler->SetTransform(m_CurrentGenericTransform);
-        resampler->SetInput( movingImageMask->GetImage() );
-        resampler->SetOutputParametersFromImage( fixedImageMask->GetImage() );
-        resampler->Update();
-
-        typedef itk::AddImageFilter< MaskImageType, MaskImageType > AddFilterType;
-        AddFilterType::Pointer adder = AddFilterType::New();
-        adder->SetInput1( fixedImageMask->GetImage() );
-        adder->SetInput2( resampler->GetOutput() );
-        adder->Update();
-
-        /*
-          * typedef itk::ImageFileWriter<MaskImageType> WriterType;
-          * WriterType::Pointer writer = WriterType::New();
-          * writer->SetFileName( "/tmp/jointMask.nrrd" );
-          * writer->SetInput( adder->GetOutput() );
-          * writer->Update();
-          */
-
         ImageMaskSpatialObjectType::Pointer jointMask = ImageMaskSpatialObjectType::New();
-        jointMask->SetImage( adder->GetOutput() );
-        jointMask->ComputeObjectToWorldTransform();
 
+        if(m_FixedBinaryVolume.GetPointer() != NULL && m_MovingBinaryVolume.GetPointer() != NULL)
+          {
+          typedef ImageMaskSpatialObjectType::ImageType                            MaskImageType;
+          typedef itk::ResampleImageFilter< MaskImageType, MaskImageType, double > ResampleFilterType;
+          ResampleFilterType::Pointer resampler = ResampleFilterType::New();
+          resampler->SetTransform(m_CurrentGenericTransform);
+          resampler->SetInput( movingImageMask->GetImage() );
+          resampler->SetOutputParametersFromImage( fixedImageMask->GetImage() );
+          resampler->Update();
+
+          typedef itk::AddImageFilter< MaskImageType, MaskImageType > AddFilterType;
+          AddFilterType::Pointer adder = AddFilterType::New();
+          adder->SetInput1( fixedImageMask->GetImage() );
+          adder->SetInput2( resampler->GetOutput() );
+          adder->Update();
+
+          /*
+            * typedef itk::ImageFileWriter<MaskImageType> WriterType;
+            * WriterType::Pointer writer = WriterType::New();
+              * writer->SetFileName( "/tmp/jointMask.nrrd" );
+            * writer->SetInput( adder->GetOutput() );
+            * writer->Update();
+            */
+
+          jointMask->SetImage( adder->GetOutput() );
+          }
+        else if(m_FixedBinaryVolume.GetPointer() != NULL)
+          {
+          jointMask->SetImage(fixedImageMask->GetImage());
+          }
+        else if(m_MovingBinaryVolume.GetPointer() != NULL)
+          {
+          // Resample to fixed
+          typedef ImageMaskSpatialObjectType::ImageType                            MaskImageType;
+          typedef itk::ResampleImageFilter< MaskImageType, MaskImageType, double > ResampleFilterType;
+          ResampleFilterType::Pointer resampler = ResampleFilterType::New();
+          resampler->SetTransform(m_CurrentGenericTransform);
+          resampler->SetInput( movingImageMask->GetImage() );
+          resampler->SetOutputParametersFromImage( m_FixedVolume );
+          resampler->Update();
+
+          jointMask->SetImage(resampler->GetOutput());
+          }
+        else
+          {
+          std::cerr << "ERROR: Failed to initialize masks in ROIBSpline!" << std::endl;
+          return;
+          }
+
+        jointMask->ComputeObjectToWorldTransform();
+        
         typename FixedImageType::Pointer    roiImage = FixedImageType::New();
         typename FixedImageType::RegionType roiRegion =
           jointMask->GetAxisAlignedBoundingBoxRegion();
@@ -1474,6 +1502,9 @@ BRAINSFitHelperTemplate<FixedImageType, MovingImageType>::StartRegistration(void
           test_MMICostMetric->SetUseExplicitPDFDerivatives(UseExplicitPDFDerivatives);
           }
         }
+      
+      std::cout << "Saving the bspline initial transform 2" << std::endl;
+      itk::WriteTransformToDisk(initialBSplineTransform, "bspline_initial.tfm");
       outputBSplineTransform =
         DoBSpline< RegisterImageType, SpatialObjectType,
                    BSplineTransformType >(

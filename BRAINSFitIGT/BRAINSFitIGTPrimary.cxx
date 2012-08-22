@@ -444,20 +444,34 @@ int BRAINSFitIGTPrimary(int argc, char *argv[])
     else if ( maskProcessingMode == "ROI" )
       {
       if ( ( fixedBinaryVolume == "" )
-           || ( movingBinaryVolume == "" ) )
+           && ( movingBinaryVolume == "" ) )
         {
         std::cout
         <<
-        "ERROR:  Must specify mask file names when ROI is used for the maskProcessingMode"
+        "ERROR:  Must specify at least one mask file name when ROI is used for the maskProcessingMode"
         << std::endl;
         exit(-1);
         }
-      fixedMask = ReadImageMask< SpatialObjectType, Dimension >(
-        fixedBinaryVolume,
-        extractFixedVolume.GetPointer() );
-      movingMask = ReadImageMask< SpatialObjectType, Dimension >(
-        movingBinaryVolume,
-        extractMovingVolume.GetPointer() );
+      if(fixedBinaryVolume != "")
+        {
+        fixedMask = ReadImageMask< SpatialObjectType, Dimension >(
+          fixedBinaryVolume,
+          extractFixedVolume.GetPointer() );
+        }
+      else
+        {
+        fixedMask = NULL;
+        }
+      if(movingBinaryVolume != "")
+        {
+        movingMask = ReadImageMask< SpatialObjectType, Dimension >(
+          movingBinaryVolume,
+          extractMovingVolume.GetPointer() );
+        }
+      else
+        {
+        movingMask = NULL;
+        }
       }
       { // Write out some debugging information if requested
       typedef itk::Image< unsigned char, 3 >                               MaskImageType;
